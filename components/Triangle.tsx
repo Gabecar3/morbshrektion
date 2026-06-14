@@ -87,6 +87,21 @@ export default function Triangle({
     setDraggingId(null);
   }
 
+  async function handleDelete(id: string) {
+    await fetch("/api/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+
+    if (selectedDotId === id) {
+      setSelectedDotId(null);
+    }
+  }
+
+  const selectedDot =
+    movies.find((m) => m.id === selectedDotId) || null;
+
   function handleTriangleClick(e: any) {
     if (!selectedMovie) return;
 
@@ -103,14 +118,6 @@ export default function Triangle({
     });
   }
 
-  async function handleDelete(id: string) {
-    await fetch("/api/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-  }
-
   return (
     <div className="relative w-full h-full flex flex-col overflow-hidden">
 
@@ -119,6 +126,7 @@ export default function Triangle({
 
         <div className="border-t border-dashed border-gray-400 pt-2" />
 
+        {/* Controls */}
         <div className="text-xs bg-gray-50 border rounded p-2 w-fit">
           <div className="font-bold text-sm mb-1">
             Controls
@@ -129,9 +137,29 @@ export default function Triangle({
           <div>Drag → move instantly</div>
         </div>
 
+        {/* Selected header */}
         <div className="font-bold text-sm">
           Selected Movie
         </div>
+
+        {/* Selected info (RESTORED) */}
+        {selectedDot && (
+          <div className="border rounded bg-white shadow p-3 text-sm w-fit">
+            <div className="font-semibold mb-1">
+              {selectedDot.title}
+            </div>
+
+            <div>Shrek: {pct(selectedDot.shrek)}</div>
+            <div>Inception: {pct(selectedDot.inception)}</div>
+            <div>Morbius: {pct(selectedDot.morbius)}</div>
+          </div>
+        )}
+
+        {!selectedDot && (
+          <div className="text-xs text-gray-500">
+            Click a dot to view details
+          </div>
+        )}
 
         {selectedMovie && (
           <div className="text-sm">
@@ -151,14 +179,12 @@ export default function Triangle({
           onPointerLeave={handlePointerUp}
           onClick={handleTriangleClick}
         >
-          {/* triangle */}
           <polygon
             points="50,5 5,95 95,95"
             fill="none"
             stroke="black"
           />
 
-          {/* labels */}
           <text x="50" y="4" textAnchor="middle" fontSize="4">
             Inception
           </text>
@@ -169,7 +195,6 @@ export default function Triangle({
             Shrek
           </text>
 
-          {/* dots */}
           {movies.map((m) => {
             const pos =
               dragPos.current[m.id] ??
@@ -180,28 +205,21 @@ export default function Triangle({
               );
 
             const isSelected = selectedDotId === m.id;
-            const isHovered = hoveredId === m.id;
-            const isDragging = draggingId === m.id;
 
             return (
               <g key={m.id}>
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r={isDragging ? 1.2 : isHovered ? 1.0 : 0.85}
-                  fill={isDragging ? "#ff4d4d" : "black"}
+                  r={0.9}
+                  fill="black"
                   stroke={isSelected ? "#3b82f6" : "white"}
                   strokeWidth={0.4}
-                  style={{
-                    cursor: isDragging ? "grabbing" : "grab",
-                    transition: "r 0.08s ease",
-                  }}
+                  style={{ cursor: "grab" }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
                     setDraggingId(m.id);
                   }}
-                  onPointerEnter={() => setHoveredId(m.id)}
-                  onPointerLeave={() => setHoveredId(null)}
                   onClick={(e) => {
                     e.stopPropagation();
 
@@ -219,7 +237,7 @@ export default function Triangle({
                   y={pos.y - 2}
                   fontSize="3"
                   pointerEvents="none"
-                  opacity={isHovered || isSelected ? 1 : 0.6}
+                  opacity={0.7}
                 >
                   {m.title.slice(0, 3).toUpperCase()}
                 </text>
