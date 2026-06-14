@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState } from "react";
 import {
   barycentricToCartesian,
   cartesianToBarycentric,
@@ -23,13 +23,19 @@ export default function Triangle({
   selectedMovie: any;
   onAdd: (movie: any) => void;
 }) {
-  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedDotId, setSelectedDotId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const dragPos = useRef<Record<string, { x: number; y: number }>>({});
   const pointer = useRef<{ x: number; y: number } | null>(null);
+
   const raf = useRef<number | null>(null);
   const lastSent = useRef<Record<string, number>>({});
+
+  function pct(v: number) {
+    return `${(v * 100).toFixed(0)}%`;
+  }
 
   function getPos(e: any) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -55,15 +61,16 @@ export default function Triangle({
     });
   }
 
-  function handleMouseMove(e: any) {
+  function handlePointerMove(e: any) {
     if (!draggingId) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
 
-    pointer.current = {
-      x: ((e.clientX - rect.left) / rect.width) * 100,
-      y: ((e.clientY - rect.top) / rect.height) * 100,
-    };
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    pointer.current = { x, y };
+    dragPos.current[draggingId] = { x, y };
 
     if (!raf.current) {
       raf.current = requestAnimationFrame(() => {
@@ -71,16 +78,29 @@ export default function Triangle({
 
         if (!draggingId || !pointer.current) return;
 
-        const { x, y } = pointer.current;
-
-        dragPos.current[draggingId] = { x, y };
-        sendUpdate(draggingId, x, y);
+        sendUpdate(draggingId, pointer.current.x, pointer.current.y);
       });
     }
   }
 
-  function handleMouseUp() {
+  function handlePointerUp() {
     setDraggingId(null);
+  }
+
+  function handleTriangleClick(e: any) {
+    if (!selectedMovie) return;
+
+    const { x, y } = getPos(e);
+
+    const bary = cartesianToBarycentric(x, y);
+
+    onAdd({
+      title: selectedMovie.title,
+      tmdb_id: selectedMovie.id,
+      poster: selectedMovie.poster_path,
+      year: selectedMovie.release_date,
+      ...bary,
+    });
   }
 
   async function handleDelete(id: string) {
@@ -88,33 +108,6 @@ export default function Triangle({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
-    });
-  }
-
-  function getSelectedDot(): Movie | null {
-    if (!selectedDotId) return null;
-    return movies.find((m) => m.id === selectedDotId) || null;
-  }
-
-  const selectedDot = getSelectedDot();
-
-  function pct(v: number) {
-    return `${(v * 100).toFixed(0)}%`;
-  }
-
-  async function handleTriangleClick(e: any) {
-    if (!selectedMovie) return;
-
-    const { x, y } = getPos(e);
-
-    const bary = cartesianToBarycentric(x, y);
-
-    await onAdd({
-      title: selectedMovie.title,
-      tmdb_id: selectedMovie.id,
-      poster: selectedMovie.poster_path,
-      year: selectedMovie.release_date,
-      ...bary,
     });
   }
 
@@ -126,33 +119,19 @@ export default function Triangle({
 
         <div className="border-t border-dashed border-gray-400 pt-2" />
 
-        {/* CONTROLS */}
         <div className="text-xs bg-gray-50 border rounded p-2 w-fit">
           <div className="font-bold text-sm mb-1">
             Controls
           </div>
           <div>Click triangle → place movie</div>
-          <div>Click dot → view info</div>
-          <div>Shift + Click → delete dot</div>
-          <div>Drag dot → reposition</div>
+          <div>Click dot → select</div>
+          <div>Shift + Click → delete</div>
+          <div>Drag → move instantly</div>
         </div>
 
-        {/* SELECTED HEADER */}
         <div className="font-bold text-sm">
           Selected Movie
         </div>
-
-        {/* SELECTED INFO */}
-        {selectedDot && (
-          <div className="border rounded bg-white shadow p-3 text-sm w-fit">
-            <div className="font-semibold mb-1">
-              {selectedDot.title}
-            </div>
-            <div>Shrek: {pct(selectedDot.shrek)}</div>
-            <div>Inception: {pct(selectedDot.inception)}</div>
-            <div>Morbius: {pct(selectedDot.morbius)}</div>
-          </div>
-        )}
 
         {selectedMovie && (
           <div className="text-sm">
@@ -167,17 +146,19 @@ export default function Triangle({
         <svg
           viewBox="0 0 100 100"
           className="w-full h-full border"
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
           onClick={handleTriangleClick}
         >
+          {/* triangle */}
           <polygon
             points="50,5 5,95 95,95"
             fill="none"
             stroke="black"
           />
 
+          {/* labels */}
           <text x="50" y="4" textAnchor="middle" fontSize="4">
             Inception
           </text>
@@ -188,6 +169,7 @@ export default function Triangle({
             Shrek
           </text>
 
+          {/* dots */}
           {movies.map((m) => {
             const pos =
               dragPos.current[m.id] ??
@@ -197,20 +179,29 @@ export default function Triangle({
                 m.morbius
               );
 
+            const isSelected = selectedDotId === m.id;
+            const isHovered = hoveredId === m.id;
+            const isDragging = draggingId === m.id;
+
             return (
               <g key={m.id}>
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r={0.85}
-                  fill="black"
-                  stroke="white"
-                  strokeWidth="0.3"
-                  style={{ cursor: "grab" }}
-                  onMouseDown={(e) => {
+                  r={isDragging ? 1.2 : isHovered ? 1.0 : 0.85}
+                  fill={isDragging ? "#ff4d4d" : "black"}
+                  stroke={isSelected ? "#3b82f6" : "white"}
+                  strokeWidth={0.4}
+                  style={{
+                    cursor: isDragging ? "grabbing" : "grab",
+                    transition: "r 0.08s ease",
+                  }}
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     setDraggingId(m.id);
                   }}
+                  onPointerEnter={() => setHoveredId(m.id)}
+                  onPointerLeave={() => setHoveredId(null)}
                   onClick={(e) => {
                     e.stopPropagation();
 
@@ -228,6 +219,7 @@ export default function Triangle({
                   y={pos.y - 2}
                   fontSize="3"
                   pointerEvents="none"
+                  opacity={isHovered || isSelected ? 1 : 0.6}
                 >
                   {m.title.slice(0, 3).toUpperCase()}
                 </text>
