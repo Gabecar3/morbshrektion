@@ -122,47 +122,54 @@ export default function Triangle({
     <div className="relative w-full h-full flex flex-col overflow-hidden">
 
       {/* HEADER */}
-      <div className="shrink-0 px-3 pt-3 space-y-3">
+      <div className="shrink-0 px-4 pt-4 space-y-4">
 
         <div className="border-t border-dashed border-gray-400 pt-2" />
 
-        {/* Controls */}
-        <div className="text-xs bg-gray-50 border rounded p-2 w-fit">
-          <div className="font-bold text-sm mb-1">
+        {/* CONTROLS CARD */}
+        <div className="bg-gray-50 border rounded-lg p-3 shadow-sm w-fit min-w-[220px]">
+
+          <div className="text-base font-bold mb-2 tracking-wide">
             Controls
           </div>
-          <div>Click triangle → place movie</div>
-          <div>Click dot → select</div>
-          <div>Shift + Click → delete</div>
-          <div>Drag → move instantly</div>
+
+          <div className="text-xs leading-relaxed space-y-1 text-gray-700">
+            <div>Click triangle → place movie</div>
+            <div>Click dot → select</div>
+            <div>Shift + Click → delete</div>
+            <div>Drag → move instantly</div>
+          </div>
         </div>
 
-        {/* Selected header */}
-        <div className="font-bold text-sm">
+        {/* SELECTED HEADER */}
+        <div className="text-base font-bold tracking-wide">
           Selected Movie
         </div>
 
-        {/* Selected info (RESTORED) */}
+        {/* SELECTED CARD */}
         {selectedDot && (
-          <div className="border rounded bg-white shadow p-3 text-sm w-fit">
-            <div className="font-semibold mb-1">
+          <div className="border rounded-lg bg-white shadow-md p-3 text-sm w-fit min-w-[220px]">
+
+            <div className="font-semibold text-base mb-2">
               {selectedDot.title}
             </div>
 
-            <div>Shrek: {pct(selectedDot.shrek)}</div>
-            <div>Inception: {pct(selectedDot.inception)}</div>
-            <div>Morbius: {pct(selectedDot.morbius)}</div>
+            <div className="space-y-1 text-gray-700">
+              <div>Shrek: {pct(selectedDot.shrek)}</div>
+              <div>Inception: {pct(selectedDot.inception)}</div>
+              <div>Morbius: {pct(selectedDot.morbius)}</div>
+            </div>
           </div>
         )}
 
         {!selectedDot && (
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-500 italic">
             Click a dot to view details
           </div>
         )}
 
         {selectedMovie && (
-          <div className="text-sm">
+          <div className="text-sm text-gray-700">
             Placing: <b>{selectedMovie.title}</b>
           </div>
         )}
