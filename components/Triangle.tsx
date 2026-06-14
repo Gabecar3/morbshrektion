@@ -27,9 +27,16 @@ export default function Triangle({
   const [selectedDot, setSelectedDot] = useState<Movie | null>(null);
 
   const dragPos = useRef<Record<string, { x: number; y: number }>>({});
+  const pointer = useRef<{ x: number; y: number } | null>(null);
+  const raf = useRef<number | null>(null);
+
   const lastSent = useRef<Record<string, number>>({});
 
-  function getMousePos(e: any) {
+  function pct(v: number) {
+    return `${(v * 100).toFixed(0)}%`;
+  }
+
+  function getPos(e: any) {
     const rect = e.currentTarget.getBoundingClientRect();
 
     return {
@@ -38,42 +45,43 @@ export default function Triangle({
     };
   }
 
-  function pct(v: number) {
-    return `${(v * 100).toFixed(0)}%`;
-  }
-
-  async function sendUpdate(id: string, x: number, y: number) {
+  function sendUpdate(id: string, x: number, y: number) {
     const now = Date.now();
 
-    // Throttle updates to avoid hammering the API
-    if (lastSent.current[id] && now - lastSent.current[id] < 100) {
-      return;
-    }
-
+    if (lastSent.current[id] && now - lastSent.current[id] < 120) return;
     lastSent.current[id] = now;
 
     const bary = cartesianToBarycentric(x, y);
 
-    await fetch("/api/update", {
+    fetch("/api/update", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id,
-        ...bary,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...bary }),
     });
   }
 
   function handleMouseMove(e: any) {
     if (!draggingId) return;
 
-    const { x, y } = getMousePos(e);
+    const rect = e.currentTarget.getBoundingClientRect();
 
-    dragPos.current[draggingId] = { x, y };
+    pointer.current = {
+      x: ((e.clientX - rect.left) / rect.width) * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    };
 
-    sendUpdate(draggingId, x, y);
+    if (!raf.current) {
+      raf.current = requestAnimationFrame(() => {
+        raf.current = null;
+
+        if (!draggingId || !pointer.current) return;
+
+        const { x, y } = pointer.current;
+
+        dragPos.current[draggingId] = { x, y };
+        sendUpdate(draggingId, x, y);
+      });
+    }
   }
 
   function handleMouseUp() {
@@ -83,9 +91,7 @@ export default function Triangle({
   async function handleDelete(id: string) {
     await fetch("/api/delete", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
   }
@@ -93,7 +99,7 @@ export default function Triangle({
   async function handleTriangleClick(e: any) {
     if (!selectedMovie) return;
 
-    const { x, y } = getMousePos(e);
+    const { x, y } = getPos(e);
 
     const bary = cartesianToBarycentric(x, y);
 
@@ -108,16 +114,27 @@ export default function Triangle({
 
   return (
     <div className="relative w-full h-full flex flex-col overflow-hidden">
-      {/* HEADER */}
-      <div className="shrink-0 px-2 pt-2 space-y-2">
+
+      {/* HEADER + CONTROLS */}
+      <div className="shrink-0 px-3 pt-3 space-y-2">
+
         <div className="border-t border-dashed border-gray-400 pt-2" />
 
+        {/* Controls panel */}
+        <div className="text-xs bg-gray-50 border rounded p-2 w-fit">
+          <div className="font-bold mb-1">Controls</div>
+          <div>• Click triangle → place movie</div>
+          <div>• Click dot → view info</div>
+          <div>• Shift + Click dot → delete</div>
+          <div>• Drag dot → reposition</div>
+        </div>
+
+        {/* Selected info */}
         {selectedDot && (
           <div className="border rounded bg-white shadow p-3 text-sm w-fit">
             <div className="font-bold text-base mb-1">
               {selectedDot.title}
             </div>
-
             <div>Shrek: {pct(selectedDot.shrek)}</div>
             <div>Inception: {pct(selectedDot.inception)}</div>
             <div>Morbius: {pct(selectedDot.morbius)}</div>
@@ -133,6 +150,7 @@ export default function Triangle({
 
       {/* TRIANGLE */}
       <div className="flex-1 min-h-0 flex items-center justify-center">
+
         <svg
           viewBox="0 0 100 100"
           className="w-full h-full border"
@@ -141,42 +159,24 @@ export default function Triangle({
           onMouseLeave={handleMouseUp}
           onClick={handleTriangleClick}
         >
-          {/* Triangle outline */}
           <polygon
             points="50,5 5,95 95,95"
             fill="none"
             stroke="black"
           />
 
-          {/* Vertex labels */}
-          <text
-            x="50"
-            y="4"
-            textAnchor="middle"
-            fontSize="4"
-          >
+          {/* labels */}
+          <text x="50" y="4" textAnchor="middle" fontSize="4">
             Inception
           </text>
-
-          <text
-            x="5"
-            y="98"
-            textAnchor="start"
-            fontSize="4"
-          >
+          <text x="5" y="98" textAnchor="start" fontSize="4">
             Morbius
           </text>
-
-          <text
-            x="95"
-            y="98"
-            textAnchor="end"
-            fontSize="4"
-          >
+          <text x="95" y="98" textAnchor="end" fontSize="4">
             Shrek
           </text>
 
-          {/* Movie dots */}
+          {/* dots */}
           {movies.map((m) => {
             const pos =
               dragPos.current[m.id] ??
@@ -191,14 +191,13 @@ export default function Triangle({
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r={0.8}
+                  r={0.85}
                   fill="black"
                   stroke="white"
                   strokeWidth="0.3"
                   style={{ cursor: "grab" }}
                   onMouseDown={(e) => {
                     e.stopPropagation();
-
                     setDraggingId(m.id);
                   }}
                   onClick={(e) => {
@@ -225,6 +224,7 @@ export default function Triangle({
             );
           })}
         </svg>
+
       </div>
     </div>
   );
