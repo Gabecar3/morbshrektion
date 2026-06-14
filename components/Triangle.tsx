@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import {
   barycentricToCartesian,
   cartesianToBarycentric,
@@ -24,17 +24,12 @@ export default function Triangle({
   onAdd: (movie: any) => void;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [selectedDot, setSelectedDot] = useState<Movie | null>(null);
+  const [selectedDotId, setSelectedDotId] = useState<string | null>(null);
 
   const dragPos = useRef<Record<string, { x: number; y: number }>>({});
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const raf = useRef<number | null>(null);
-
   const lastSent = useRef<Record<string, number>>({});
-
-  function pct(v: number) {
-    return `${(v * 100).toFixed(0)}%`;
-  }
 
   function getPos(e: any) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -96,6 +91,17 @@ export default function Triangle({
     });
   }
 
+  function getSelectedDot(): Movie | null {
+    if (!selectedDotId) return null;
+    return movies.find((m) => m.id === selectedDotId) || null;
+  }
+
+  const selectedDot = getSelectedDot();
+
+  function pct(v: number) {
+    return `${(v * 100).toFixed(0)}%`;
+  }
+
   async function handleTriangleClick(e: any) {
     if (!selectedMovie) return;
 
@@ -115,24 +121,31 @@ export default function Triangle({
   return (
     <div className="relative w-full h-full flex flex-col overflow-hidden">
 
-      {/* HEADER + CONTROLS */}
-      <div className="shrink-0 px-3 pt-3 space-y-2">
+      {/* HEADER */}
+      <div className="shrink-0 px-3 pt-3 space-y-3">
 
         <div className="border-t border-dashed border-gray-400 pt-2" />
 
-        {/* Controls panel */}
+        {/* CONTROLS */}
         <div className="text-xs bg-gray-50 border rounded p-2 w-fit">
-          <div className="font-bold mb-1">Controls</div>
-          <div>• Click triangle → place movie</div>
-          <div>• Click dot → view info</div>
-          <div>• Shift + Click dot → delete</div>
-          <div>• Drag dot → reposition</div>
+          <div className="font-bold text-sm mb-1">
+            Controls
+          </div>
+          <div>Click triangle → place movie</div>
+          <div>Click dot → view info</div>
+          <div>Shift + Click → delete dot</div>
+          <div>Drag dot → reposition</div>
         </div>
 
-        {/* Selected info */}
+        {/* SELECTED HEADER */}
+        <div className="font-bold text-sm">
+          Selected Movie
+        </div>
+
+        {/* SELECTED INFO */}
         {selectedDot && (
           <div className="border rounded bg-white shadow p-3 text-sm w-fit">
-            <div className="font-bold text-base mb-1">
+            <div className="font-semibold mb-1">
               {selectedDot.title}
             </div>
             <div>Shrek: {pct(selectedDot.shrek)}</div>
@@ -143,7 +156,7 @@ export default function Triangle({
 
         {selectedMovie && (
           <div className="text-sm">
-            Selected: <b>{selectedMovie.title}</b>
+            Placing: <b>{selectedMovie.title}</b>
           </div>
         )}
       </div>
@@ -165,7 +178,6 @@ export default function Triangle({
             stroke="black"
           />
 
-          {/* labels */}
           <text x="50" y="4" textAnchor="middle" fontSize="4">
             Inception
           </text>
@@ -176,7 +188,6 @@ export default function Triangle({
             Shrek
           </text>
 
-          {/* dots */}
           {movies.map((m) => {
             const pos =
               dragPos.current[m.id] ??
@@ -208,7 +219,7 @@ export default function Triangle({
                       return;
                     }
 
-                    setSelectedDot(m);
+                    setSelectedDotId(m.id);
                   }}
                 />
 
